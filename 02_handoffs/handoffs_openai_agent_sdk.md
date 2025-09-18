@@ -1,4 +1,4 @@
-# Handoffs in OpenAI Agent SDK with Gemini API
+# Handoffs in OpenAI Agent SDK
 
 This document provides a comprehensive, step-by-step guide to
 understanding and implementing **Handoffs** within the OpenAI Agent SDK.
