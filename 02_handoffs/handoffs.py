@@ -1,3 +1,4 @@
+from datetime import datetime
 from agents import Agent, RunContextWrapper , Runner , AsyncOpenAI, OpenAIChatCompletionsModel, enable_verbose_stdout_logging, handoff 
 from agents.run import RunConfig
 from agents.extensions import handoff_filters
@@ -56,6 +57,13 @@ def on_handoff_Agent_data(ctx: RunContextWrapper[None], agent: Agent ):
 
 
 
+# Create a function to determine if urdu agent is available
+def is_urdu_agent_available(ctx: RunContextWrapper[None], agent: Agent[None]) -> bool:
+    current_hour = datetime.now().hour
+    # Return karega True agar 9 AM aur 5 PM ke beech ho, warna False
+    return 9 <= current_hour < 17
+
+
 #handsoff practise 
 # Create the math agent with the model and config
 math_agent = Agent(
@@ -87,6 +95,7 @@ agent: Agent = Agent(
                 on_handoff=on_handoff_Agent_data,
                 input_type=EscalationAgent,
                 input_filter=handoff_filters.remove_all_tools,
+                is_enabled=is_urdu_agent_available
         )
     ],
  
