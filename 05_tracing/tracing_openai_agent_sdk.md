@@ -1,0 +1,169 @@
+# Tracing in OpenAI Agent SDK with Gemini API Configuration
+
+This document provides a comprehensive guide to understanding and using tracing within the OpenAI Agent SDK. It covers the core concepts, practical implementation with code examples, and advanced configurations to help you debug, visualize, and monitor your agent workflows.
+
+-----
+
+## 1. What is Tracing?
+
+Tracing is the process of recording and monitoring the step-by-step execution of an agent's run. It provides a detailed log of events that occur during a workflow, such as LLM generations, tool calls, and handoffs.
+
+### Why is Tracing Important?
+
+  * **Debugging:** When an agent fails, tracing helps you pinpoint exactly where the error occurred. You can see which LLM call or tool usage led to the problem.
+  * **Performance Monitoring:** Traces show the time taken for each operation, allowing you to identify bottlenecks in your workflow.
+  * **Visualization:** The collected data can be visualized on a dashboard, providing a clear, chronological view of your agent's decision-making process.
+
+By default, tracing is enabled in the OpenAI Agents SDK to provide immediate insights.
+
+-----
+
+## 2. Core Concepts: Traces and Spans
+
+Tracing is built on two fundamental concepts: **Traces** and **Spans**.
+
+### Trace
+
+A **trace** represents a complete, end-to-end operation or a single "workflow." Think of it as a complete story of your agent's task.
+
+  * **`workflow_name`**: The name of your logical workflow (e.g., "Customer Service" or "Code Generation").
+  * **`trace_id`**: A unique ID that identifies the entire trace.
+  * **`group_id`**: An optional ID to link multiple traces from the same conversation.
+
+### Span
+
+A **span** represents a single, time-based event or operation within a trace. Spans are the individual chapters of your story.
+
+  * **Timestamps**: Each span has a `started_at` and `ended_at` timestamp.
+  * **`trace_id`**: Links the span to its parent trace.
+  * **`parent_id`**: Links a span to its parent span, creating a nested hierarchy.
+
+-----
+
+## 3. Default Tracing Behavior
+
+When you run an agent, the SDK automatically creates and records traces and spans for various events. This built-in functionality requires no extra code on your part.
+
+### Default Spans:
+
+The following events are automatically wrapped in a span:
+
+  * **Runner Run:** The entire `Runner.run()` operation is a trace named "Agent workflow" by default.
+  * **Agent Run:** Each time an agent executes a step, it's captured in an `agent_span()`.
+  * **LLM Generation:** Calls to the language model are recorded in a `generation_span()`.
+  * **Function Calls:** Tool usage is logged in a `function_span()`.
+  * **Guardrails:** Checks for guardrails are recorded in a `guardrail_span()`.
+  * **Handoffs:** Transfers between agents are logged in a `handoff_span()`.
+
+-----
+
+## 4. Controlling Tracing
+
+You have full control over when and how tracing is used.
+
+### Method 1: Globally Disabling Tracing
+
+To disable tracing for your entire application, set an environment variable before running your code.
+
+```sh
+export OPENAI_AGENTS_DISABLE_TRACING=1
+```
+
+**Explanation:** The SDK checks this environment variable at startup. If it is set to `1`, no tracing data will be collected, which can be useful for production environments where you don't require debugging and want to minimize overhead.
+
+### Method 2: Disabling Tracing for a Single Run
+
+You can disable tracing for a specific `Runner.run()` call using the `RunConfig`.
+
+```python
+from agents import Agent, Runner, RunConfig
+
+agent = Agent(name="My Agent", instructions="...")
+
+# Disable tracing for this specific run
+config = RunConfig(tracing_disabled=True)
+result = await Runner.run(agent, "My prompt", config=config)
+```
+
+**Explanation:** This is a more flexible approach. The `RunConfig` object passes configuration details to the agent runner. Setting `tracing_disabled=True` overrides the default behavior for that particular execution.
+
+-----
+
+## 5. Customizing Tracing
+
+You can create your own traces and spans to get a more organized and comprehensive view of your workflow.
+
+### Creating Higher-Level Traces
+
+Use the `with trace(...)` context manager to group multiple `Runner.run()` calls into a single, logical trace. This is ideal for multi-turn conversations or complex workflows.
+
+**Code Example:**
+
+```python
+from agents import Agent, Runner, trace
+
+async def main():
+    agent = Agent(name="Joke generator", instructions="Tell funny jokes.")
+    
+    with trace("Joke Evaluation Workflow"):
+        # This and all subsequent runs within this block will be part of this trace
+        first_result = await Runner.run(agent, "Tell me a joke")
+        second_result = await Runner.run(agent, f"Rate this joke: {first_result.final_output}")
+```
+
+**Explanation:** The `with trace(...)` statement creates a new trace. All spans generated by the code inside this block, including those from `Runner.run()`, will be nested under this single trace. This makes it easy to visualize the entire workflow from a single entry in your tracing dashboard.
+
+### Creating Custom Spans
+
+Use `custom_span()` to trace operations that are outside the agent's core functionality, such as database calls or external API requests. This provides a complete end-to-end view of your application's workflow.
+
+**Code Example:**
+
+```python
+from agents import Agent, Runner, trace, custom_span
+import time
+
+async def main_with_custom_span():
+    agent = Agent(name="Data Assistant", instructions="Analyze data and provide insights.")
+
+    with trace("Data Analysis Workflow"):
+        # Custom span to track data loading from an external source
+        with custom_span("Load Data", data={"source": "database", "query": "SELECT * FROM sales;"}):
+            print("Loading data from database...")
+            time.sleep(2)  # Simulate a database query
+            print("Data loaded successfully.")
+
+        # Agent runs with the loaded data
+        result = await Runner.run(agent, "Summarize the sales data.")
+        print(f"Agent's final summary: {result.final_output}")
+```
+
+**Explanation:** The `with custom_span(...)` block creates a new span specifically for the data loading operation. You can add custom data to this span using the `data` parameter. This allows you to log important details and timestamps for steps that are not part of the default agent execution. This is critical for debugging issues that occur outside the agent itself.
+
+-----
+
+## 6. Handling Sensitive Data
+
+Tracing can capture inputs and outputs of LLM generations and function calls, which might contain sensitive information.
+
+**Solution:**
+
+Use `RunConfig` to disable the inclusion of sensitive data in your traces.
+
+```python
+from agents import Agent, Runner, RunConfig
+
+async def main_sensitive_data():
+    agent = Agent(name="Secure Agent", instructions="Handle customer information.")
+    
+    config = RunConfig(
+        trace_include_sensitive_data=False
+    )
+
+    # Prompt contains sensitive customer data
+    prompt = "Find the order history for customer ID: 12345."
+    
+    result = await Runner.run(agent, prompt, config=config)
+```
+
+**Explanation:** By setting `trace_include_sensitive_data=False`, you ensure that the `input` and `output` fields of `generation_span` and `function_span` are not recorded. This helps maintain data privacy and complies with security policies while still allowing you to see the overall workflow structure.

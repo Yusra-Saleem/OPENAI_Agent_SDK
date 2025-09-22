@@ -1,0 +1,5 @@
+# add .env file to .gitignore
+.env
+.venv
+# ignore all .venev files
+.venv/
