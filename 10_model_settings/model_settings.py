@@ -67,7 +67,7 @@ agent: Agent = Agent(
 # Result of the run
 result = Runner.run_sync(
     agent,
-    "create a poetry about the sea and give the summary of it",
+    "create a poetry about the sea and summarize it",
     run_config=config,
 )
 
